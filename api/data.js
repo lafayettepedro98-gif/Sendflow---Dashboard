@@ -1,6 +1,3 @@
-// Vercel Serverless Function — proxy seguro para a API SendFlow
-// A API key fica aqui no servidor via variável de ambiente, nunca exposta ao navegador
-
 const BASE = 'https://sendflow.pro/sendapi';
 const CAMPAIGN_ID = 'Q8ezymXY1DNIi8JR2t3z';
 
@@ -8,7 +5,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.SENDFLOW_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key não configurada no servidor.' });
+    return res.status(500).json({ error: 'API key nao configurada.' });
   }
 
   const headers = {
@@ -29,22 +26,14 @@ export default async function handler(req, res) {
       groups = Array.isArray(raw) ? raw : (raw.groups || raw.data || []);
     }
 
-    let analytics = null;
-    if (analyticsRes.ok) {
-      analytics = await analyticsRes.json();
-    }
-
-    let campaign = {};
-    if (campaignRes.ok) {
-      campaign = await campaignRes.json();
-    }
+    const analytics = analyticsRes.ok ? await analyticsRes.json() : null;
+    const campaign  = campaignRes.ok  ? await campaignRes.json()  : {};
 
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(200).json({ campaign, groups, analytics });
 
   } catch (err) {
-    return res.status(500).json({ error: 'Erro ao buscar dados do SendFlow.', detail: err.message });
+    return res.status(500).json({ error: err.message });
   }
 }
-
