@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.SENDFLOW_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key não configurada.' });
+    return res.status(500).json({ error: 'API key não configurada no servidor.' });
   }
 
   const headers = {
@@ -14,26 +14,21 @@ export default async function handler(req, res) {
   };
 
   try {
-    const groupsRes = await fetch(`${BASE}/releases/${CAMPAIGN_ID}/groups`, { headers });
-    const groupsText = await groupsRes.text();
-    
-    const analyticsRes = await fetch(`${BASE}/releases/${CAMPAIGN_ID}/analytics`, { headers });
-    const analyticsText = await analyticsRes.text();
+    const [groupsRes, analyticsRes, campaignRes] = await Promise.all([
+      fetch(`${BASE}/releases/${CAMPAIGN_ID}/groups`,    { headers }),
+      fetch(`${BASE}/releases/${CAMPAIGN_ID}/analytics`, { headers }),
+      fetch(`${BASE}/releases/${CAMPAIGN_ID}`,           { headers }),
+    ]);
 
-    const campaignRes = await fetch(`${BASE}/releases/${CAMPAIGN_ID}`, { headers });
-    const campaignText = await campaignRes.text();
+    const groups    = groupsRes.ok    ? await groupsRes.json()    : [];
+    const analytics = analyticsRes.ok ? await analyticsRes.json() : null;
+    const campaign  = campaignRes.ok  ? await campaignRes.json()  : {};
 
-    return res.status(200).json({
-      debug: {
-        groupsStatus: groupsRes.status,
-        analyticsStatus: analyticsRes.status,
-        campaignStatus: campaignRes.status,
-        groupsBody: groupsText.slice(0, 500),
-        campaignBody: campaignText.slice(0, 500),
-      }
-    });
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.status(200).json({ campaign, groups, analytics });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Erro ao buscar dados do SendFlow.', detail: err.message });
   }
 }
