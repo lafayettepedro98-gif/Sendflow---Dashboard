@@ -42,7 +42,12 @@ export default async function handler(req, res) {
               output_amount:       analytics?.remove?.total || 0,
               clicks_total:        analytics?.clicks?.total || 0,
               source: 'api',
+              groups: groups,
             };
+          } else {
+            // API dessincronizada mas temos a lista de grupos — retorna sem participantes
+            liveData = null;
+            liveData = { groups: groups, source: 'api_desynced' };
           }
         }
       } catch (e) {
@@ -95,7 +100,8 @@ export default async function handler(req, res) {
       history,
       inputsHoje,
       outputsHoje,
-      hasData: !!latest,
+      hasData: !!(latest && latest.participants_amount > 0),
+      groups: liveData?.groups || [],
     });
 
   } catch (err) {
