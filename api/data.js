@@ -2,109 +2,137 @@ const SUPABASE_URL  = 'https://dpiovtnsztstvybyrieq.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwaW92dG5zenRzdHZ5YnlyaWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDczOTQsImV4cCI6MjA5NDg4MzM5NH0.tsaZJxF4CF7tyrcUnO9HqMdzhcoJX2zwEZjmkNKabaE';
 const SENDFLOW_BASE = 'https://sendflow.pro/sendapi';
 const CAMPAIGN_ID   = 'Q8ezymXY1DNIi8JR2t3z';
+const ADMINS        = 5;
 
 export default async function handler(req, res) {
   const apiKey      = process.env.SENDFLOW_API_KEY;
-  const supaHeaders = {
-    'apikey': SUPABASE_ANON,
-    'Authorization': `Bearer ${SUPABASE_ANON}`,
-  };
+  const supaKey     = process.env.SUPABASE_SERVICE_KEY;
+  const anonHeaders = { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` };
+  const svcHeaders  = supaKey
+    ? { 'apikey': supaKey, 'Authorization': `Bearer ${supaKey}`, 'Content-Type': 'application/json' }
+    : anonHeaders;
 
   try {
+    let liveGroups  = [];
+    let liveMetrics = null;
+
     // 1. Tenta buscar dados frescos da SendAPI
-    let liveData = null;
     if (apiKey) {
       try {
-        const sfHeaders = {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        };
+        const sfHeaders = { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
         const [groupsRes, analyticsRes] = await Promise.all([
           fetch(`${SENDFLOW_BASE}/releases/${CAMPAIGN_ID}/groups`,    { headers: sfHeaders }),
           fetch(`${SENDFLOW_BASE}/releases/${CAMPAIGN_ID}/analytics`, { headers: sfHeaders }),
         ]);
-        if (groupsRes.ok && analyticsRes.ok) {
-          const rawGroups   = await groupsRes.json();
-          const analytics   = await analyticsRes.json();
-          const groups      = Array.isArray(rawGroups) ? rawGroups : (rawGroups.groups || rawGroups.data || []);
-          const totalParts  = groups.reduce((s, g) => s + (g.participantsAmount || 0), 0);
+        if (groupsRes.ok) {
+          const raw = await groupsRes.json();
+          liveGroups = Array.isArray(raw) ? raw : (raw.groups || raw.data || []);
+        }
+        if (analyticsRes.ok && liveGroups.length) {
+          const analytics  = await analyticsRes.json();
+          const totalParts = liveGroups.reduce((s, g) => s + (g.participantsAmount || 0), 0);
+          const synced     = totalParts > liveGroups.length * ADMINS;
 
-          // Só usa dados da API se participantes > 0 (não dessincronizado)
-          if (totalParts > 0) {
-            const ADMINS_PER_GROUP = 5;
-            const totalAdmins = groups.length * ADMINS_PER_GROUP;
-            liveData = {
+          if (synced) {
+            const totalAdmins = liveGroups.length * ADMINS;
+            liveMetrics = {
               participants_amount: Math.max(0, totalParts - totalAdmins),
-              groups_total:        groups.length,
-              groups_full:         groups.filter(g => g.full).length,
-              groups_open:         groups.filter(g => !g.full).length,
-              input_amount:        analytics?.add?.total    || 0,
-              output_amount:       analytics?.remove?.total || 0,
-              clicks_total:        analytics?.clicks?.total || 0,
+              groups_total:  liveGroups.length,
+              groups_full:   liveGroups.filter(g => g.full).length,
+              groups_open:   liveGroups.filter(g => !g.full).length,
+              input_amount:  analytics?.add?.total    || 0,
+              output_amount: analytics?.remove?.total || 0,
+              clicks_total:  analytics?.clicks?.total || 0,
               source: 'api',
-              groups: groups,
             };
-          } else {
-            // API dessincronizada — salva os grupos mas não os métricas
-            liveData = { groups: groups, source: 'api_desynced' };
+
+            // Salva grupos no Supabase para usar como cache
+            if (supaKey) {
+              const upserts = liveGroups.map(g => ({
+                campaign_id: CAMPAIGN_ID,
+                group_id:    g.id,
+                group_name:  g.name,
+                is_full:     g.full || false,
+                count:       g.count || 0,
+              }));
+              await fetch(`${SUPABASE_URL}/rest/v1/groups_cache`, {
+                method: 'POST',
+                headers: { ...svcHeaders, 'Prefer': 'resolution=merge-duplicates' },
+                body: JSON.stringify(upserts),
+              }).catch(e => console.warn('Failed to cache groups:', e));
+            }
           }
         }
       } catch (e) {
-        console.warn('SendAPI error, falling back to Supabase:', e.message);
+        console.warn('SendAPI error:', e.message);
       }
     }
 
-    // 2. Busca último snapshot do Supabase (fallback ou complemento)
+    // 2. Busca grupos do cache Supabase se API não retornou grupos válidos
+    let cachedGroups = liveGroups;
+    if (!cachedGroups.length) {
+      const gcRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/groups_cache?campaign_id=eq.${CAMPAIGN_ID}&order=count.asc`,
+        { headers: anonHeaders }
+      );
+      if (gcRes.ok) {
+        const gc = await gcRes.json();
+        cachedGroups = gc.map(g => ({
+          id:                g.group_id,
+          name:              g.group_name,
+          full:              g.is_full,
+          count:             g.count,
+          participantsAmount: 0,
+        }));
+      }
+    }
+
+    // 3. Busca métricas do Supabase se API dessincronizada
     const snapRes = await fetch(
       `${SUPABASE_URL}/rest/v1/group_snapshots?order=created_at.desc&limit=1`,
-      { headers: supaHeaders }
+      { headers: anonHeaders }
     );
-    const snapshots = snapRes.ok ? await snapRes.json() : [];
-    const latestSnap = snapshots[0] || null;
-
-    // 3. Combina: métricas da API (se sincronizada) ou Supabase, grupos sempre da API
-    const apiGroups = liveData?.groups || [];
-    const metricsFromApi = liveData?.source === 'api' ? liveData : null;
-    const metricsFromSupa = latestSnap ? {
+    const snapshots   = snapRes.ok ? await snapRes.json() : [];
+    const latestSnap  = snapshots[0] || null;
+    const supaMetrics = latestSnap ? {
       participants_amount: latestSnap.participants_amount,
-      groups_total:        latestSnap.groups_total,
-      groups_full:         latestSnap.groups_full,
-      groups_open:         latestSnap.groups_open,
-      input_amount:        latestSnap.input_amount,
-      output_amount:       latestSnap.output_amount,
-      clicks_total:        latestSnap.clicks_total,
+      groups_total:  latestSnap.groups_total,
+      groups_full:   latestSnap.groups_full,
+      groups_open:   latestSnap.groups_open,
+      input_amount:  latestSnap.input_amount,
+      output_amount: latestSnap.output_amount,
+      clicks_total:  latestSnap.clicks_total,
       source: 'supabase',
     } : null;
 
-    const latest = metricsFromApi || metricsFromSupa || null;
+    const latest = liveMetrics || supaMetrics || null;
 
-    // 4. Histórico dos snapshots para os gráficos
+    // 4. Histórico
     const histRes = await fetch(
       `${SUPABASE_URL}/rest/v1/group_snapshots?order=created_at.asc&limit=500`,
-      { headers: supaHeaders }
+      { headers: anonHeaders }
     );
     const history = histRes.ok ? await histRes.json() : [];
 
-    // 5. Eventos em tempo real das últimas 24h
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // 5. Eventos hoje
+    const since = new Date(Date.now() - 24*60*60*1000).toISOString();
     const eventsRes = await fetch(
       `${SUPABASE_URL}/rest/v1/realtime_events?created_at=gte.${since}&order=created_at.desc&limit=100`,
-      { headers: supaHeaders }
+      { headers: anonHeaders }
     );
     const events = eventsRes.ok ? await eventsRes.json() : [];
+    const inputsHoje  = events.filter(e => e.event_type==='input' ).reduce((s,e)=>s+(e.amount||1),0);
+    const outputsHoje = events.filter(e => e.event_type==='output').reduce((s,e)=>s+(e.amount||1),0);
 
-    const inputsHoje  = events.filter(e => e.event_type === 'input' ).reduce((s, e) => s + (e.amount || 1), 0);
-    const outputsHoje = events.filter(e => e.event_type === 'output').reduce((s, e) => s + (e.amount || 1), 0);
-
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control','no-cache');
+    res.setHeader('Access-Control-Allow-Origin','*');
     return res.status(200).json({
       latest,
       history,
       inputsHoje,
       outputsHoje,
-      hasData: !!(latest || apiGroups.length > 0),
-      groups: apiGroups,
+      hasData: !!(latest || cachedGroups.length > 0),
+      groups: cachedGroups,
     });
 
   } catch (err) {
