@@ -103,7 +103,7 @@ export default async function handler(req, res) {
       history,
       inputsHoje,
       outputsHoje,
-      hasData: !!latest,
+      hasData: !!(latest || apiGroups.length > 0),
       groups: apiGroups,
     });
 
