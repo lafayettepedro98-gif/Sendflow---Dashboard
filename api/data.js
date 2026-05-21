@@ -45,8 +45,7 @@ export default async function handler(req, res) {
               groups: groups,
             };
           } else {
-            // API dessincronizada mas temos a lista de grupos — retorna sem participantes
-            liveData = null;
+            // API dessincronizada — salva os grupos mas não os métricas
             liveData = { groups: groups, source: 'api_desynced' };
           }
         }
@@ -63,8 +62,10 @@ export default async function handler(req, res) {
     const snapshots = snapRes.ok ? await snapRes.json() : [];
     const latestSnap = snapshots[0] || null;
 
-    // 3. Usa dados da API se disponíveis, senão usa Supabase
-    const latest = liveData || (latestSnap ? {
+    // 3. Combina: métricas da API (se sincronizada) ou Supabase, grupos sempre da API
+    const apiGroups = liveData?.groups || [];
+    const metricsFromApi = liveData?.source === 'api' ? liveData : null;
+    const metricsFromSupa = latestSnap ? {
       participants_amount: latestSnap.participants_amount,
       groups_total:        latestSnap.groups_total,
       groups_full:         latestSnap.groups_full,
@@ -73,7 +74,9 @@ export default async function handler(req, res) {
       output_amount:       latestSnap.output_amount,
       clicks_total:        latestSnap.clicks_total,
       source: 'supabase',
-    } : null);
+    } : null;
+
+    const latest = metricsFromApi || metricsFromSupa || null;
 
     // 4. Histórico dos snapshots para os gráficos
     const histRes = await fetch(
@@ -100,8 +103,8 @@ export default async function handler(req, res) {
       history,
       inputsHoje,
       outputsHoje,
-      hasData: !!(latest && latest.participants_amount > 0),
-      groups: liveData?.groups || [],
+      hasData: !!latest,
+      groups: apiGroups,
     });
 
   } catch (err) {
