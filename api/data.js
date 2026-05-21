@@ -131,12 +131,9 @@ export default async function handler(req, res) {
     );
     const history = histRes.ok ? await histRes.json() : [];
 
-    // 5. Eventos hoje (a partir da meia-noite do dia atual, horário de Brasília UTC-3)
+    // 5. Eventos hoje (a partir da meia-noite UTC, igual ao SendFlow)
     const now = new Date();
-    const meianoite = new Date(now);
-    meianoite.setUTCHours(3, 0, 0, 0); // meia-noite em Brasília = 03:00 UTC
-    // Se ainda não passou das 03:00 UTC de hoje, volta para o dia anterior
-    if (now < meianoite) meianoite.setUTCDate(meianoite.getUTCDate() - 1);
+    const meianoite = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
     const since = meianoite.toISOString();
 
     const eventsRes = await fetch(
