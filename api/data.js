@@ -60,6 +60,23 @@ export default async function handler(req, res) {
                 headers: { ...svcHeaders, 'Prefer': 'resolution=merge-duplicates' },
                 body: JSON.stringify(upserts),
               }).catch(e => console.warn('Failed to cache groups:', e));
+
+              // Salva snapshot de métricas para garantir fallback correto
+              const snapshot = {
+                campaign_id:         CAMPAIGN_ID,
+                participants_amount: liveMetrics.participants_amount,
+                groups_total:        liveMetrics.groups_total,
+                groups_full:         liveMetrics.groups_full,
+                groups_open:         liveMetrics.groups_open,
+                input_amount:        liveMetrics.input_amount,
+                output_amount:       liveMetrics.output_amount,
+                clicks_total:        liveMetrics.clicks_total,
+              };
+              await fetch(`${SUPABASE_URL}/rest/v1/group_snapshots`, {
+                method: 'POST',
+                headers: svcHeaders,
+                body: JSON.stringify(snapshot),
+              }).catch(e => console.warn('Failed to save snapshot:', e));
             }
           }
         }
