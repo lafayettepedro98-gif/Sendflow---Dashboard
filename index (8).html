@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Mentoría Inglés en 90 Horas</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#050608;--surface:#0c0d11;--surface2:#111318;
+  --border:rgba(255,255,255,0.05);--text:#d8dce8;--muted:#4a5060;
+  --accent:#00c988;--accent2:#6a5fd6;--accent3:#d4901f;--danger:#e04444;
+  --font:'Syne',sans-serif;--mono:'DM Mono',monospace;
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100%;}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(0,201,136,.5);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(.7);}}
+.brand-name{font-size:15px;font-weight:800;}
+.brand-sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:1px;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);font-size:11px;font-family:var(--mono);color:var(--muted);}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);}
+.status-pill.ok{color:var(--accent);border-color:rgba(0,201,136,.25);}
+.status-pill.ok .status-dot{background:var(--accent);}
+.status-pill.err{color:var(--danger);border-color:rgba(224,68,68,.25);}
+.status-pill.err .status-dot{background:var(--danger);}
+.status-pill.warn{color:var(--accent3);border-color:rgba(212,144,31,.25);}
+.status-pill.warn .status-dot{background:var(--accent3);}
+.btn{padding:7px 16px;border-radius:7px;border:none;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.btn-accent{background:var(--accent);color:#050608;}
+.btn-accent:hover{filter:brightness(.88);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* TABS NAV */
+.tabs-wrap{background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.tabs-nav{display:flex;padding:.6rem 1.5rem 0;gap:3px;min-width:max-content;}
+.tab-btn{
+  padding:.5rem 1rem;border-radius:8px 8px 0 0;border:none;
+  background:transparent;color:var(--muted);font-family:var(--font);
+  font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
+  white-space:nowrap;border-bottom:2px solid transparent;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:rgba(0,201,136,.06);}
+
+/* MAIN */
+.main{max-width:1100px;margin:0 auto;padding:2rem 2rem 4rem;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* EMPTY / ERROR */
+.empty-state{text-align:center;padding:6rem 2rem;max-width:480px;margin:0 auto;}
+.empty-icon{font-size:48px;margin-bottom:1rem;}
+.empty-title{font-size:20px;font-weight:800;margin-bottom:.5rem;}
+.empty-sub{font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.7;margin-bottom:1.5rem;}
+.empty-url{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.8rem 1rem;font-family:var(--mono);font-size:13px;color:var(--accent);word-break:break-all;}
+
+/* METRICS */
+.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem;}
+.metrics-row2{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;}
+@media(max-width:700px){.metrics-row,.metrics-row2{grid-template-columns:repeat(2,1fr);}}
+.mcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.2rem;position:relative;overflow:hidden;}
+.mcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.mcard.c1::after{background:linear-gradient(90deg,var(--accent),transparent);}
+.mcard.c2::after{background:linear-gradient(90deg,var(--accent2),transparent);}
+.mcard.c3::after{background:linear-gradient(90deg,var(--accent3),transparent);}
+.mcard.c4::after{background:linear-gradient(90deg,var(--danger),transparent);}
+.mcard.c5::after{background:linear-gradient(90deg,#38bdf8,transparent);}
+.mcard.c6::after{background:linear-gradient(90deg,#a3e635,transparent);}
+.mcard.c7::after{background:linear-gradient(90deg,#e879f9,transparent);}
+.mcard-label{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;margin-bottom:.5rem;}
+.mcard-val{font-size:26px;font-weight:800;line-height:1;}
+.mcard-delta{font-size:11px;margin-top:.4rem;font-family:var(--mono);color:var(--muted);}
+.mcard-delta.up{color:var(--accent);}
+.mcard-delta.dn{color:var(--danger);}
+
+/* CHART CARD */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.4rem;margin-bottom:1rem;}
+.chart-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1.1rem;}
+.chart-title{font-size:14px;font-weight:700;}
+.chart-sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:3px;}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--muted);font-family:var(--mono);}
+.legend-item{display:flex;align-items:center;gap:5px;}
+.legend-sq{width:10px;height:10px;border-radius:2px;}
+
+/* GROUP CARDS GRID */
+.section-label{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:.8rem;margin-top:.5rem;}
+.group-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.8rem;}
+.gcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .2s,transform .15s;}
+.gcard:hover{border-color:var(--accent);transform:translateY(-2px);}
+.gcard-num{font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:.3rem;}
+.gcard-name{font-size:12px;font-weight:700;margin-bottom:.6rem;line-height:1.3;}
+.gcard-members{font-size:22px;font-weight:800;line-height:1;}
+.gcard-members-label{font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:.5rem;}
+.gcard-bar-track{background:var(--surface2);border-radius:20px;height:4px;}
+.gcard-bar-fill{height:4px;border-radius:20px;}
+.gcard-pct{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:3px;}
+.gcard-badge{display:inline-block;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:20px;margin-top:.4rem;}
+.badge-ok{background:rgba(0,201,136,.1);color:var(--accent);}
+.badge-warn{background:rgba(212,144,31,.1);color:var(--accent3);}
+.badge-full{background:rgba(224,68,68,.12);color:var(--danger);}
+
+/* GROUP DETAIL */
+.detail-header{display:flex;align-items:center;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap;}
+.back-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:8px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;}
+.back-btn:hover{color:var(--text);}
+.detail-title{font-size:18px;font-weight:800;flex:1;}
+.detail-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;}
+@media(max-width:600px){.detail-metrics{grid-template-columns:repeat(2,1fr);}}
+.cap-bar-wrap{background:var(--surface2);border-radius:20px;height:12px;margin:.5rem 0;}
+.cap-bar-fill{height:12px;border-radius:20px;transition:width .8s ease;}
+.cap-bar-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono);}
+
+.footer{text-align:right;font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:1.2rem;opacity:.6;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <div>
+      <div class="brand-name">SendFlow Dashboard</div>
+      <div class="brand-sub">Mentoría Inglés en 90 Horas</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="status-pill" id="status-pill">
+      <div class="status-dot"></div>
+      <span id="status-txt">conectando...</span>
+    </div>
+    <button class="btn btn-accent" id="btn-refresh" onclick="loadData()" disabled>↻ atualizar</button>
+  </div>
+</div>
+
+<div class="tabs-wrap">
+  <div class="tabs-nav" id="tabs-nav">
+    <button class="tab-btn active" onclick="showTab('visao-geral')" id="tab-visao-geral">Visão Geral</button>
+  </div>
+</div>
+
+<div class="main" id="main">
+  <div style="text-align:center;padding:4rem;color:var(--muted);font-family:var(--mono);font-size:13px;">📡 buscando dados...</div>
+</div>
+
+<script>
+const COLORS = ['#00c988','#6a5fd6','#d4901f','#e04444','#38bdf8','#fb7185','#a3e635','#e879f9',
+                '#f97316','#8b5cf6','#06b6d4','#84cc16','#ec4899','#14b8a6','#f59e0b','#6366f1',
+                '#10b981','#f43f5e','#0ea5e9','#eab308','#8b5cf6','#22d3ee','#4ade80','#fb923c',
+                '#c084fc','#34d399','#60a5fa'];
+const ADMINS_PER_GROUP = 5;
+let chartAnalytics = null;
+let groupCharts = {};
+let cachedGroups = [];
+let activeTab = 'visao-geral';
+
+function setStatus(cls, txt){
+  const p = document.getElementById('status-pill');
+  p.className = 'status-pill'+(cls?' '+cls:'');
+  document.getElementById('status-txt').textContent = txt;
+}
+
+function showTab(id){
+  activeTab = id;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id==='tab-'+id));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+id));
+}
+
+function extractNum(name){
+  const m = String(name||'').match(/#(\d+)/);
+  return m ? parseInt(m[1]) : 999;
+}
+
+function fmtN(n){ return Number(n||0).toLocaleString('pt-BR'); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function loadData(){
+  document.getElementById('btn-refresh').disabled = true;
+  setStatus('','atualizando...');
+  try {
+    const res = await fetch('/api/data');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if(!data.hasData){
+      renderEmpty();
+      setStatus('warn','aguardando dados');
+    } else {
+      // Fetch groups for individual tabs
+      await fetchAndRender(data);
+      setStatus('ok','atualizado');
+    }
+  } catch(e){
+    setStatus('err','erro');
+    document.getElementById('main').innerHTML = `
+      <div style="text-align:center;padding:4rem;border:1px dashed rgba(224,68,68,.3);border-radius:14px;margin-top:1rem;">
+        <div style="font-size:32px;margin-bottom:1rem;">⚠️</div>
+        <div style="font-size:15px;font-weight:700;color:var(--danger);margin-bottom:.5rem;">Erro ao carregar</div>
+        <div style="font-size:12px;color:var(--muted);font-family:var(--mono);">${e.message}</div>
+      </div>`;
+    console.error(e);
+  } finally {
+    document.getElementById('btn-refresh').disabled = false;
+  }
+}
+
+async function fetchAndRender(data){
+  // Usa grupos que já vêm junto com /api/data
+  let groups = data.groups || [];
+
+  // Se não vieram grupos no data, tenta endpoint separado
+  if(!groups.length){
+    try {
+      const res = await fetch('/api/groups');
+      if(res.ok){
+        const raw = await res.json();
+        groups = Array.isArray(raw) ? raw : (raw.groups || raw.data || []);
+      }
+    } catch(e){ console.warn('Could not fetch groups:', e); }
+  }
+
+  // Se API dessincronizada (todos com participantsAmount <= 5),
+  // distribui o total proporcionalmente entre os grupos
+  const total = data.latest?.participants_amount || 0;
+  const allLow = groups.length > 0 && groups.every(g => (g.participantsAmount||0) <= 5);
+  if(allLow && total > 0 && groups.length > 0){
+    const avg = Math.round((total + groups.length * ADMINS_PER_GROUP) / groups.length);
+    groups = groups.map(g => ({ ...g, participantsAmount: avg }));
+  }
+
+  cachedGroups = groups.sort((a,b) => extractNum(a.name) - extractNum(b.name));
+  renderDashboard(data, cachedGroups);
+}
+
+function renderEmpty(){
+  document.getElementById('tabs-nav').innerHTML =
+    `<button class="tab-btn active" onclick="showTab('visao-geral')" id="tab-visao-geral">Visão Geral</button>`;
+  document.getElementById('main').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">🔗</div>
+      <div class="empty-title">Aguardando primeiro envio</div>
+      <div class="empty-sub">Configure o webhook no SendFlow apontando para a URL abaixo.</div>
+      <div class="empty-url">${window.location.origin}/api/webhook</div>
+    </div>`;
+}
+
+function renderDashboard(data, groups){
+  const l = data.latest || {};
+  const totalAdmins = (l.groups_total||0) * ADMINS_PER_GROUP;
+
+  // Build tabs
+  const nav = document.getElementById('tabs-nav');
+  let navHtml = `<button class="tab-btn ${activeTab==='visao-geral'?'active':''}" onclick="showTab('visao-geral')" id="tab-visao-geral">📊 Visão Geral</button>`;
+  groups.forEach(g => {
+    const num = extractNum(g.name);
+    const id = 'g'+g.id;
+    navHtml += `<button class="tab-btn ${activeTab===id?'active':''}" onclick="showTab('${id}')" id="tab-${id}">Grupo #${num}</button>`;
+  });
+  nav.innerHTML = navHtml;
+
+  // Build panels
+  let html = buildOverviewPanel(data, l, groups) + groups.map((g,i) => buildGroupPanel(g, i, l)).join('');
+  document.getElementById('main').innerHTML = html;
+
+  // Render analytics chart
+  renderAnalyticsChart(data.history || []);
+}
+
+function buildOverviewPanel(data, l, groups){
+  const inputsHoje  = data.inputsHoje  || 0;
+  const outputsHoje = data.outputsHoje || 0;
+
+  return `
+  <div class="tab-panel ${activeTab==='visao-geral'?'active':''}" id="panel-visao-geral">
+    <div class="metrics-row">
+      <div class="mcard c1">
+        <div class="mcard-label">participantes reais</div>
+        <div class="mcard-val">${fmtN(l.participants_amount)}</div>
+        <div class="mcard-delta">admins não contabilizados</div>
+      </div>
+      <div class="mcard c2">
+        <div class="mcard-label">entradas totais</div>
+        <div class="mcard-val">${fmtN(l.input_amount)}</div>
+        <div class="mcard-delta up">▲ ${fmtN(inputsHoje)} hoje</div>
+      </div>
+      <div class="mcard c4">
+        <div class="mcard-label">saídas totais</div>
+        <div class="mcard-val">${fmtN(l.output_amount)}</div>
+        <div class="mcard-delta dn">▼ ${fmtN(outputsHoje)} hoje</div>
+      </div>
+      <div class="mcard c5">
+        <div class="mcard-label">cliques totais</div>
+        <div class="mcard-val">${fmtN(l.clicks_total)}</div>
+        <div class="mcard-delta">em links de convite</div>
+      </div>
+    </div>
+    <div class="metrics-row2">
+      <div class="mcard c3">
+        <div class="mcard-label">grupos totais</div>
+        <div class="mcard-val">${fmtN(l.groups_total)}</div>
+        <div class="mcard-delta">grupos na campanha</div>
+      </div>
+      <div class="mcard c6">
+        <div class="mcard-label">grupos abertos</div>
+        <div class="mcard-val">${fmtN(l.groups_open)}</div>
+        <div class="mcard-delta">com vagas disponíveis</div>
+      </div>
+      <div class="mcard c7">
+        <div class="mcard-label">grupos cheios</div>
+        <div class="mcard-val">${fmtN(l.groups_full)}</div>
+        <div class="mcard-delta">sem vagas</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div><div class="chart-title">Entradas e saídas diárias</div><div class="chart-sub">evolução nos últimos 14 dias</div></div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-sq" style="background:#00c988"></span>entradas</span>
+          <span class="legend-item"><span class="legend-sq" style="background:#e04444"></span>saídas</span>
+        </div>
+      </div>
+      <div style="position:relative;height:220px;"><canvas id="chart-analytics"></canvas></div>
+    </div>
+
+    <div class="section-label">detalhes por grupo — clique para ver mais</div>
+    <div class="group-grid">
+      ${groups.map((g,i) => buildGroupCard(g, i)).join('')}
+    </div>
+    <div class="footer">última atualização: ${new Date().toLocaleString('pt-BR')}</div>
+  </div>`;
+}
+
+function buildGroupCard(g, i){
+  const num     = extractNum(g.name);
+  const members = Math.max(0, (g.participantsAmount||0) - ADMINS_PER_GROUP);
+  const cap     = 251; // 256 - 5 admins
+  const pct     = Math.min(100, Math.round(members/cap*100));
+  const color   = COLORS[i % COLORS.length];
+  const id      = 'g'+g.id;
+  let badgeCls, badgeTxt;
+  if(g.full||pct>=100){badgeCls='badge-full';badgeTxt='lotado';}
+  else if(pct>=90){badgeCls='badge-warn';badgeTxt='quase cheio';}
+  else{badgeCls='badge-ok';badgeTxt='ativo';}
+
+  return `<div class="gcard" onclick="showTab('${id}')">
+    <div class="gcard-num">GRUPO #${num}</div>
+    <div class="gcard-name">${esc(g.name)}</div>
+    <div class="gcard-members" style="color:${color}">${fmtN(members)}</div>
+    <div class="gcard-members-label">membros reais</div>
+    <div class="gcard-bar-track"><div class="gcard-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    <div class="gcard-pct">${pct}% de ${fmtN(cap)}</div>
+    <span class="gcard-badge ${badgeCls}">${badgeTxt}</span>
+  </div>`;
+}
+
+function buildGroupPanel(g, i, l){
+  const num     = extractNum(g.name);
+  const id      = 'g'+g.id;
+  const members = Math.max(0, (g.participantsAmount||0) - ADMINS_PER_GROUP);
+  const cap     = 251;
+  const pct     = Math.min(100, Math.round(members/cap*100));
+  const vagas   = Math.max(0, cap - members);
+  const color   = COLORS[i % COLORS.length];
+  let badgeCls, badgeTxt;
+  if(g.full||pct>=100){badgeCls='badge-full';badgeTxt='Lotado';}
+  else if(pct>=90){badgeCls='badge-warn';badgeTxt='Quase cheio';}
+  else{badgeCls='badge-ok';badgeTxt='Ativo';}
+
+  return `
+  <div class="tab-panel ${activeTab===id?'active':''}" id="panel-${id}">
+    <div class="detail-header">
+      <button class="back-btn" onclick="showTab('visao-geral')">← Voltar</button>
+      <div class="detail-title">Grupo #${num} — ${esc(g.name)}</div>
+      <span class="gcard-badge ${badgeCls}" style="font-size:12px;padding:4px 12px">${badgeTxt}</span>
+    </div>
+    <div class="detail-metrics">
+      <div class="mcard c1">
+        <div class="mcard-label">membros reais</div>
+        <div class="mcard-val" style="color:${color}">${fmtN(members)}</div>
+        <div class="mcard-delta">5 admins descontados</div>
+      </div>
+      <div class="mcard c3">
+        <div class="mcard-label">capacidade</div>
+        <div class="mcard-val">${fmtN(cap)}</div>
+        <div class="mcard-delta">${pct}% utilizado</div>
+      </div>
+      <div class="mcard c6">
+        <div class="mcard-label">vagas restantes</div>
+        <div class="mcard-val">${fmtN(vagas)}</div>
+        <div class="mcard-delta">disponíveis agora</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div>
+        <div class="chart-title">Ocupação do grupo</div>
+        <div class="chart-sub">membros vs capacidade total disponível</div>
+      </div></div>
+      <div style="position:relative;height:180px;"><canvas id="chart-${id}"></canvas></div>
+      <div style="margin-top:1rem;">
+        <div class="mcard-label" style="margin-bottom:.5rem;">BARRA DE CAPACIDADE</div>
+        <div class="cap-bar-wrap"><div class="cap-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="cap-bar-labels"><span>${fmtN(members)} membros</span><span>${pct}%</span><span>${fmtN(cap)} capacidade</span></div>
+      </div>
+    </div>
+    <div class="footer">grupo #${num} de ${l.groups_total||27}</div>
+  </div>`;
+}
+
+function renderAnalyticsChart(history){
+  const byDay = {};
+  history.forEach(s => {
+    const d = new Date(s.created_at);
+    const key = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!byDay[key]) byDay[key] = { input:0, output:0 };
+    byDay[key].input  = Math.max(byDay[key].input,  s.input_amount||0);
+    byDay[key].output = Math.max(byDay[key].output, s.output_amount||0);
+  });
+  const days    = Object.keys(byDay).slice(-14);
+  const inputs  = days.map(d => byDay[d].input);
+  const outputs = days.map(d => byDay[d].output);
+  const ctx = document.getElementById('chart-analytics');
+  if(!ctx) return;
+  if(chartAnalytics) chartAnalytics.destroy();
+  chartAnalytics = new Chart(ctx,{
+    type:'bar',
+    data:{labels:days, datasets:[
+      {label:'Entradas', data:inputs,  backgroundColor:'rgba(0,201,136,.7)', borderRadius:4},
+      {label:'Saídas',   data:outputs, backgroundColor:'rgba(224,68,68,.5)', borderRadius:4},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#4a5060',font:{family:'DM Mono',size:11}},grid:{color:'rgba(255,255,255,.04)'}},
+        y:{ticks:{color:'#4a5060',font:{family:'DM Mono',size:11},callback:v=>fmtN(v)},grid:{color:'rgba(255,255,255,.04)'}}
+      }}
+  });
+
+  // Render doughnut charts for each group
+  cachedGroups.forEach((g,i) => {
+    const id = 'g'+g.id;
+    const members = Math.max(0, (g.participantsAmount||0) - ADMINS_PER_GROUP);
+    const cap = 251;
+    const color = COLORS[i%COLORS.length];
+    const ctx2 = document.getElementById('chart-'+id);
+    if(!ctx2) return;
+    if(groupCharts[id]) groupCharts[id].destroy();
+    groupCharts[id] = new Chart(ctx2,{
+      type:'doughnut',
+      data:{
+        labels:['Membros','Vagas'],
+        datasets:[{data:[members, Math.max(0,cap-members)], backgroundColor:[color,'rgba(255,255,255,0.05)'], borderWidth:0}]
+      },
+      options:{responsive:true,maintainAspectRatio:false,cutout:'72%',
+        plugins:{legend:{display:true,position:'right',labels:{color:'#4a5060',font:{family:'DM Mono',size:11}}},
+          tooltip:{callbacks:{label:c=>' '+fmtN(c.parsed)+' pessoas'}}}}
+    });
+  });
+}
+
+loadData();
+</script>
+</body>
+</html>
