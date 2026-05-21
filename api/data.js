@@ -131,10 +131,16 @@ export default async function handler(req, res) {
     );
     const history = histRes.ok ? await histRes.json() : [];
 
-    // 5. Eventos hoje
-    const since = new Date(Date.now() - 24*60*60*1000).toISOString();
+    // 5. Eventos hoje (a partir da meia-noite do dia atual, horário de Brasília UTC-3)
+    const now = new Date();
+    const meianoite = new Date(now);
+    meianoite.setUTCHours(3, 0, 0, 0); // meia-noite em Brasília = 03:00 UTC
+    // Se ainda não passou das 03:00 UTC de hoje, volta para o dia anterior
+    if (now < meianoite) meianoite.setUTCDate(meianoite.getUTCDate() - 1);
+    const since = meianoite.toISOString();
+
     const eventsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/realtime_events?created_at=gte.${since}&order=created_at.desc&limit=100`,
+      `${SUPABASE_URL}/rest/v1/realtime_events?created_at=gte.${since}&order=created_at.desc&limit=1000`,
       { headers: anonHeaders }
     );
     const events = eventsRes.ok ? await eventsRes.json() : [];
