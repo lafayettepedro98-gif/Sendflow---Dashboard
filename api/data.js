@@ -1,7 +1,7 @@
 const SUPABASE_URL  = 'https://dpiovtnsztstvybyrieq.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwaW92dG5zenRzdHZ5YnlyaWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDczOTQsImV4cCI6MjA5NDg4MzM5NH0.tsaZJxF4CF7tyrcUnO9HqMdzhcoJX2zwEZjmkNKabaE';
 const SENDFLOW_BASE = 'https://sendflow.pro/sendapi';
-const CAMPAIGN_ID   = 'Q8ezymXY1DNIi8JR2t3z';
+const CAMPAIGN_ID   = 'NaPAFwR1JpgfYsnXJf1L';
 const ADMINS        = 5;
 
 export default async function handler(req, res) {
@@ -46,7 +46,6 @@ export default async function handler(req, res) {
               source: 'api',
             };
 
-            // Salva grupos no Supabase para usar como cache
             if (supaKey) {
               const upserts = liveGroups.map(g => ({
                 campaign_id: CAMPAIGN_ID,
@@ -61,7 +60,6 @@ export default async function handler(req, res) {
                 body: JSON.stringify(upserts),
               }).catch(e => console.warn('Failed to cache groups:', e));
 
-              // Salva snapshot de métricas para garantir fallback correto
               const snapshot = {
                 campaign_id:         CAMPAIGN_ID,
                 participants_amount: liveMetrics.participants_amount,
@@ -106,7 +104,7 @@ export default async function handler(req, res) {
 
     // 3. Busca métricas do Supabase se API dessincronizada
     const snapRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/group_snapshots?order=created_at.desc&limit=1`,
+      `${SUPABASE_URL}/rest/v1/group_snapshots?campaign_id=eq.${CAMPAIGN_ID}&order=created_at.desc&limit=1`,
       { headers: anonHeaders }
     );
     const snapshots   = snapRes.ok ? await snapRes.json() : [];
@@ -126,7 +124,7 @@ export default async function handler(req, res) {
 
     // 4. Histórico
     const histRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/group_snapshots?order=created_at.asc&limit=500`,
+      `${SUPABASE_URL}/rest/v1/group_snapshots?campaign_id=eq.${CAMPAIGN_ID}&order=created_at.asc&limit=500`,
       { headers: anonHeaders }
     );
     const history = histRes.ok ? await histRes.json() : [];
@@ -134,12 +132,11 @@ export default async function handler(req, res) {
     // 5. Eventos hoje (a partir da meia-noite de Brasília = 03:00 UTC)
     const now = new Date();
     const meianoite = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 3, 0, 0));
-    // Se ainda não passou das 03:00 UTC de hoje, usa o dia anterior
     if (now < meianoite) meianoite.setUTCDate(meianoite.getUTCDate() - 1);
     const since = meianoite.toISOString();
 
     const eventsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/realtime_events?created_at=gte.${since}&order=created_at.desc&limit=1000`,
+      `${SUPABASE_URL}/rest/v1/realtime_events?campaign_id=eq.${CAMPAIGN_ID}&created_at=gte.${since}&order=created_at.desc&limit=1000`,
       { headers: anonHeaders }
     );
     const events = eventsRes.ok ? await eventsRes.json() : [];
